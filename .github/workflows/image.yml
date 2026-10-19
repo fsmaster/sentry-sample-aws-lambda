@@ -1,0 +1,50 @@
+name: image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  RELEASE: sample-aws-lambda@${{ github.sha }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  SENTRY_ORG: fsmaster
+  SENTRY_PROJECT: sdk-aws-lambda
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0 # sentry needs history for set-commits
+
+      - uses: docker/setup-buildx-action@v4.4.1
+
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+          build-args: RELEASE=${{ env.RELEASE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Sentry release + commits
+        if: env.SENTRY_AUTH_TOKEN != ''
+        uses: getsentry/action-release@v3.7.1
+        with:
+          release: ${{ env.RELEASE }}
+          environment: playground
