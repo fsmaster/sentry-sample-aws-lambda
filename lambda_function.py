@@ -13,13 +13,21 @@ import time
 import sentry_sdk
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN"),
-    environment=os.environ.get("SENTRY_ENVIRONMENT", "local"),
-    release=os.environ.get("RELEASE", "sample-aws-lambda@dev"),
-    integrations=[AwsLambdaIntegration(timeout_warning=True)],
-    traces_sample_rate=1.0,
-)
+OWN_DSN = os.environ.get("SENTRY_DSN")
+
+
+def init(dsn):
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "local"),
+        release=os.environ.get("RELEASE", "sample-aws-lambda@dev"),
+        integrations=[AwsLambdaIntegration(timeout_warning=True)],
+        traces_sample_rate=1.0,
+    )
+
+
+init(OWN_DSN)
+_active_dsn = OWN_DSN
 
 
 def charge(order):
@@ -27,6 +35,14 @@ def charge(order):
 
 
 def lambda_handler(event, context):
+    # dashboard "Use my DSN". One container = one invoke at a time, so swapping
+    # the global client is safe here. On real AWS you would not do this.
+    global _active_dsn
+    want = event.get("dsn") or OWN_DSN
+    if want != _active_dsn:
+        init(want)
+        _active_dsn = want
+
     run = event.get("run", "manual")
     sentry_sdk.set_tag("run_id", run)
     if event.get("fresh", True):

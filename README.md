@@ -71,6 +71,9 @@ the process right after return.
 
 `timeout_warning=True` starts a timer a bit before `context.get_remaining_time_in_millis()` runs out.
 
+The invoke payload can have `"dsn"`, the playground sends it for **Use my DSN**. The handler then re-inits the
+SDK with it. Fine in the emulator (one invoke at a time), on real AWS you would not do this.
+
 ## On real AWS
 
 Same code, two ways:
